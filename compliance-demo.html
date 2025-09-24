@@ -10,11 +10,12 @@
   input, button { padding: 8px; margin: 5px 0; width: 100%; }
   .section { background: white; padding: 20px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
   pre { background: #eee; padding: 10px; border-radius: 5px; overflow-x: auto; }
+  button { cursor: pointer; }
 </style>
 </head>
 <body>
 
-<h1>Compliance Demo</h1>
+<h1>Compliance Demo - Workflow</h1>
 
 <div class="section">
   <h2>1. Create Merchant</h2>
@@ -29,7 +30,7 @@
 <div class="section">
   <h2>2. Upload Document</h2>
   <input type="text" id="docMerchantId" placeholder="Merchant ID">
-  <input type="text" id="docType" placeholder="Document Type (e.g., ID, Business License)">
+  <input type="text" id="docType" placeholder="Document Type (e.g., ID, License)">
   <input type="text" id="docPath" placeholder="Document Path or URL">
   <button onclick="uploadDocument()">Upload Document</button>
   <pre id="docResult">Upload result will appear here</pre>
@@ -44,6 +45,7 @@
 
 <script>
 const BACKEND_URL = "https://stripe-alt-backend-d8czhwstayhp.deno.dev"; // Your Deno backend
+let lastMerchantId = '';
 
 async function createMerchant() {
   const name = document.getElementById('merchantName').value;
@@ -58,7 +60,14 @@ async function createMerchant() {
       body: JSON.stringify({ name, business_type: type, country, website })
     });
     const data = await res.json();
+    lastMerchantId = data.id || '';
     document.getElementById('merchantResult').textContent = JSON.stringify(data, null, 2);
+
+    if(lastMerchantId) {
+      document.getElementById('docMerchantId').value = lastMerchantId;
+      document.getElementById('riskMerchantId').value = lastMerchantId;
+      alert('Merchant created! Ready to upload document.');
+    }
   } catch (err) {
     document.getElementById('merchantResult').textContent = err.message;
   }
@@ -69,6 +78,11 @@ async function uploadDocument() {
   const docType = document.getElementById('docType').value;
   const storagePath = document.getElementById('docPath').value;
 
+  if (!merchantId) {
+    alert('Please create a merchant first.');
+    return;
+  }
+
   try {
     const res = await fetch(`${BACKEND_URL}/merchants/${merchantId}/documents`, {
       method: 'POST',
@@ -77,6 +91,8 @@ async function uploadDocument() {
     });
     const data = await res.json();
     document.getElementById('docResult').textContent = JSON.stringify(data, null, 2);
+
+    alert('Document uploaded! You can now check risk profile.');
   } catch (err) {
     document.getElementById('docResult').textContent = err.message;
   }
@@ -84,10 +100,17 @@ async function uploadDocument() {
 
 async function getRiskProfile() {
   const merchantId = document.getElementById('riskMerchantId').value;
+  if (!merchantId) {
+    alert('Please create a merchant first.');
+    return;
+  }
+
   try {
     const res = await fetch(`${BACKEND_URL}/risk/${merchantId}`);
     const data = await res.json();
     document.getElementById('riskResult').textContent = JSON.stringify(data, null, 2);
+
+    alert('Risk profile fetched! Workflow complete.');
   } catch (err) {
     document.getElementById('riskResult').textContent = err.message;
   }
