@@ -13,6 +13,45 @@ import {
 import { WebView } from 'react-native-webview';
 import { createClient } from '@supabase/supabase-js';
 
+import { NavigationContainer } from '@react-navigation/native';
+import { createStackNavigator } from '@react-navigation/stack';
+import MerchantOnboard from './screens/MerchantOnboard';
+import DocumentUpload from './screens/DocumentUpload';
+import RiskProfile from './screens/RiskProfile';
+
+
+// Create a Stack navigator for the demo:
+const DemoStack = createStackNavigator();
+
+function ComplianceDemo() {
+  return (
+    <DemoStack.Navigator initialRouteName="MerchantOnboard">
+      <DemoStack.Screen name="MerchantOnboard" component={MerchantOnboard} />
+      <DemoStack.Screen name="DocumentUpload" component={DocumentUpload} />
+      <DemoStack.Screen name="RiskProfile" component={RiskProfile} />
+    </DemoStack.Navigator>
+  );
+}
+
+//Add a button in your existing ScrollView (e.g., below your payment buttons) to launch the demo:
+<TouchableOpacity
+  style={[styles.paymentButton, { backgroundColor: '#5856D6' }]}
+  onPress={() => setShowComplianceDemo(true)}
+>
+  <Text style={styles.paymentButtonText}>⚖️ Compliance Demo</Text>
+</TouchableOpacity>
+
+const [showComplianceDemo, setShowComplianceDemo] = useState(false);
+
+if (showComplianceDemo) {
+  return (
+    <NavigationContainer>
+      <ComplianceDemo />
+    </NavigationContainer>
+  );
+}
+
+
 // Configuration - Updated with your deployed backend
 const SUPABASE_URL = 'https://mock-project.supabase.co'; // Mock mode - no real Supabase needed
 const SUPABASE_ANON_KEY = 'mock-anon-key'; // Mock mode
