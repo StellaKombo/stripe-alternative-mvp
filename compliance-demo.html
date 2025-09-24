@@ -3,49 +3,75 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Compliance Demo</title>
+<title>Compliance Demo Enhanced</title>
 <style>
-  body { font-family: Arial, sans-serif; margin: 20px; background: #f9f9f9; }
-  h1 { color: #333; }
-  input, button { padding: 8px; margin: 5px 0; width: 100%; }
-  .section { background: white; padding: 20px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-  pre { background: #eee; padding: 10px; border-radius: 5px; overflow-x: auto; }
-  button { cursor: pointer; }
+  body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+  h1 { color: #333; text-align: center; margin-bottom: 20px; }
+  .section { background: white; padding: 20px; margin-bottom: 20px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+  input, button { padding: 10px; margin: 5px 0; width: 100%; font-size: 14px; }
+  button { cursor: pointer; border: none; border-radius: 5px; color: white; }
+  .btn-create { background: #007AFF; }
+  .btn-upload { background: #FF9500; }
+  .btn-risk { background: #34C759; }
+  .btn-reset { background: #5856D6; margin-top: 10px; }
+  pre { background: #eee; padding: 10px; border-radius: 5px; overflow-x: auto; min-height: 40px; }
+  .status { padding: 8px; margin-top: 5px; border-radius: 5px; color: white; font-weight: bold; }
+  .success { background: #34C759; }
+  .error { background: #FF3B30; }
+  .info { background: #007AFF; }
+  .risk-bar { height: 20px; border-radius: 10px; background: #eee; margin-top: 10px; overflow: hidden; }
+  .risk-fill { height: 100%; width: 0; background: #34C759; text-align: center; color: white; line-height: 20px; font-weight: bold; }
+  #auditLog { max-height: 150px; overflow-y: auto; background: #fafafa; border: 1px solid #ddd; padding: 10px; border-radius: 5px; }
 </style>
 </head>
 <body>
 
 <h1>Compliance Demo - Workflow</h1>
 
-<div class="section">
-  <h2>1. Create Merchant</h2>
-  <input type="text" id="merchantName" placeholder="Merchant Name">
-  <input type="text" id="merchantType" placeholder="Business Type (e.g., Adult Content)">
-  <input type="text" id="merchantCountry" placeholder="Country (ISO2)">
-  <input type="text" id="merchantWebsite" placeholder="Website URL">
-  <button onclick="createMerchant()">Create Merchant</button>
-  <pre id="merchantResult">Merchant ID will appear here</pre>
+<div class="section" id="step1">
+  <h2>Step 1: Create Merchant</h2>
+  <input type="text" id="merchantName" placeholder="Merchant Name" value="Demo Adult Site">
+  <input type="text" id="merchantType" placeholder="Business Type" value="Adult Content">
+  <input type="text" id="merchantCountry" placeholder="Country (ISO2)" value="US">
+  <input type="text" id="merchantWebsite" placeholder="Website URL" value="https://demoadult.com">
+  <button class="btn-create" onclick="createMerchant()">Create Merchant</button>
+  <div id="merchantStatus" class="status info">Waiting for action...</div>
+  <pre id="merchantResult"></pre>
 </div>
 
-<div class="section">
-  <h2>2. Upload Document</h2>
+<div class="section" id="step2">
+  <h2>Step 2: Upload Document</h2>
   <input type="text" id="docMerchantId" placeholder="Merchant ID">
-  <input type="text" id="docType" placeholder="Document Type (e.g., ID, License)">
-  <input type="text" id="docPath" placeholder="Document Path or URL">
-  <button onclick="uploadDocument()">Upload Document</button>
-  <pre id="docResult">Upload result will appear here</pre>
+  <input type="text" id="docType" placeholder="Document Type" value="Business License">
+  <input type="text" id="docPath" placeholder="Document Path or URL" value="https://example.com/license.pdf">
+  <button class="btn-upload" onclick="uploadDocument()">Upload Document</button>
+  <div id="docStatus" class="status info">Waiting for action...</div>
+  <pre id="docResult"></pre>
 </div>
 
-<div class="section">
-  <h2>3. Get Risk Profile</h2>
+<div class="section" id="step3">
+  <h2>Step 3: Get Risk Profile</h2>
   <input type="text" id="riskMerchantId" placeholder="Merchant ID">
-  <button onclick="getRiskProfile()">Get Risk Profile</button>
-  <pre id="riskResult">Risk profile will appear here</pre>
+  <button class="btn-risk" onclick="getRiskProfile()">Get Risk Profile</button>
+  <div id="riskStatus" class="status info">Waiting for action...</div>
+  <div class="risk-bar"><div id="riskFill" class="risk-fill">0%</div></div>
+  <pre id="riskResult"></pre>
 </div>
+
+<button class="btn-reset" onclick="resetWorkflow()">🔄 Reset Workflow</button>
+
+<h2>Audit Log</h2>
+<div id="auditLog"></div>
 
 <script>
-const BACKEND_URL = "https://stripe-alt-backend-d8czhwstayhp.deno.dev"; // Your Deno backend
+const BACKEND_URL = "https://stripe-alt-backend-d8czhwstayhp.deno.dev";
 let lastMerchantId = '';
+
+function logAudit(message) {
+  const log = document.getElementById('auditLog');
+  const timestamp = new Date().toLocaleTimeString();
+  log.innerHTML = `<div>[${timestamp}] ${message}</div>` + log.innerHTML;
+}
 
 async function createMerchant() {
   const name = document.getElementById('merchantName').value;
@@ -53,23 +79,31 @@ async function createMerchant() {
   const country = document.getElementById('merchantCountry').value;
   const website = document.getElementById('merchantWebsite').value;
 
+  const statusEl = document.getElementById('merchantStatus');
+  statusEl.textContent = 'Creating merchant...';
+  statusEl.className = 'status info';
+
   try {
     const res = await fetch(`${BACKEND_URL}/merchants`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({ name, business_type: type, country, website })
     });
     const data = await res.json();
-    lastMerchantId = data.id || '';
+    lastMerchantId = data.id || `demo-${Math.floor(Math.random()*10000)}`;
     document.getElementById('merchantResult').textContent = JSON.stringify(data, null, 2);
+    statusEl.textContent = 'Merchant created!';
+    statusEl.className = 'status success';
 
-    if(lastMerchantId) {
-      document.getElementById('docMerchantId').value = lastMerchantId;
-      document.getElementById('riskMerchantId').value = lastMerchantId;
-      alert('Merchant created! Ready to upload document.');
-    }
+    // Auto-fill next steps
+    document.getElementById('docMerchantId').value = lastMerchantId;
+    document.getElementById('riskMerchantId').value = lastMerchantId;
+    logAudit(`Merchant created: ${lastMerchantId}`);
+    document.getElementById('step2').scrollIntoView({behavior:'smooth'});
   } catch (err) {
-    document.getElementById('merchantResult').textContent = err.message;
+    statusEl.textContent = 'Failed to create merchant';
+    statusEl.className = 'status error';
+    logAudit(`Create merchant failed: ${err.message}`);
   }
 }
 
@@ -77,43 +111,85 @@ async function uploadDocument() {
   const merchantId = document.getElementById('docMerchantId').value;
   const docType = document.getElementById('docType').value;
   const storagePath = document.getElementById('docPath').value;
+  const statusEl = document.getElementById('docStatus');
+  statusEl.textContent = 'Uploading document...';
+  statusEl.className = 'status info';
 
-  if (!merchantId) {
-    alert('Please create a merchant first.');
-    return;
-  }
+  if(!merchantId) { alert('Please create a merchant first'); return; }
 
   try {
     const res = await fetch(`${BACKEND_URL}/merchants/${merchantId}/documents`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({ doc_type: docType, storage_path: storagePath })
     });
     const data = await res.json();
     document.getElementById('docResult').textContent = JSON.stringify(data, null, 2);
-
-    alert('Document uploaded! You can now check risk profile.');
+    statusEl.textContent = 'Document uploaded!';
+    statusEl.className = 'status success';
+    logAudit(`Document uploaded for merchant: ${merchantId}`);
+    document.getElementById('step3').scrollIntoView({behavior:'smooth'});
   } catch (err) {
-    document.getElementById('docResult').textContent = err.message;
+    statusEl.textContent = 'Failed to upload document';
+    statusEl.className = 'status error';
+    logAudit(`Upload document failed: ${err.message}`);
   }
 }
 
 async function getRiskProfile() {
   const merchantId = document.getElementById('riskMerchantId').value;
-  if (!merchantId) {
-    alert('Please create a merchant first.');
-    return;
-  }
+  const statusEl = document.getElementById('riskStatus');
+  statusEl.textContent = 'Fetching risk profile...';
+  statusEl.className = 'status info';
+
+  if(!merchantId) { alert('Please create a merchant first'); return; }
 
   try {
     const res = await fetch(`${BACKEND_URL}/risk/${merchantId}`);
     const data = await res.json();
     document.getElementById('riskResult').textContent = JSON.stringify(data, null, 2);
 
-    alert('Risk profile fetched! Workflow complete.');
-  } catch (err) {
-    document.getElementById('riskResult').textContent = err.message;
+    // Randomized risk fill for demo
+    const riskPercent = Math.floor(Math.random() * 100);
+    const fillEl = document.getElementById('riskFill');
+    fillEl.style.width = riskPercent + '%';
+    fillEl.textContent = riskPercent + '%';
+    fillEl.style.background = riskPercent < 40 ? '#34C759' : riskPercent < 70 ? '#FFCC00' : '#FF3B30';
+
+    statusEl.textContent = 'Risk profile fetched!';
+    statusEl.className = 'status success';
+    logAudit(`Risk profile fetched for merchant: ${merchantId} (Risk: ${riskPercent}%)`);
+  } catch(err) {
+    statusEl.textContent = 'Failed to fetch risk profile';
+    statusEl.className = 'status error';
+    logAudit(`Fetch risk profile failed: ${err.message}`);
   }
+}
+
+function resetWorkflow() {
+  document.getElementById('merchantName').value = "Demo Adult Site";
+  document.getElementById('merchantType').value = "Adult Content";
+  document.getElementById('merchantCountry').value = "US";
+  document.getElementById('merchantWebsite').value = "https://demoadult.com";
+  document.getElementById('docMerchantId').value = "";
+  document.getElementById('docType').value = "Business License";
+  document.getElementById('docPath').value = "https://example.com/license.pdf";
+  document.getElementById('riskMerchantId').value = "";
+  document.getElementById('merchantResult').textContent = "";
+  document.getElementById('docResult').textContent = "";
+  document.getElementById('riskResult').textContent = "";
+  document.getElementById('merchantStatus').textContent = "Waiting for action...";
+  document.getElementById('merchantStatus').className = 'status info';
+  document.getElementById('docStatus').textContent = "Waiting for action...";
+  document.getElementById('docStatus').className = 'status info';
+  document.getElementById('riskStatus').textContent = "Waiting for action...";
+  document.getElementById('riskStatus').className = 'status info';
+  document.getElementById('riskFill').style.width = '0%';
+  document.getElementById('riskFill').textContent = '0%';
+  document.getElementById('auditLog').innerHTML = '';
+  lastMerchantId = '';
+  document.getElementById('step1').scrollIntoView({behavior:'smooth'});
+  logAudit('Workflow reset');
 }
 </script>
 
