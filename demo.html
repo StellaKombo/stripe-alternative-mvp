@@ -126,6 +126,18 @@
             background: linear-gradient(135deg, #FF9500 0%, #CC7700 100%);
         }
         
+        .wallet-button {
+            background: linear-gradient(135deg, #32D74B 0%, #28A745 100%);
+        }
+        
+        .bnpl-button {
+            background: linear-gradient(135deg, #AF52DE 0%, #8E44AD 100%);
+        }
+        
+        .regional-button {
+            background: linear-gradient(135deg, #FF3B30 0%, #DC3545 100%);
+        }
+        
         .payment-subtext {
             font-size: 12px;
             opacity: 0.8;
@@ -250,6 +262,21 @@
                     ₿ Pay with Crypto
                     <div class="payment-subtext">Bitcoin, Ethereum, etc.</div>
                 </button>
+                
+                <button class="payment-button wallet-button" onclick="handleWalletPayment()">
+                    📱 Mobile Wallets
+                    <div class="payment-subtext">Apple Pay, Google Pay, M-Pesa</div>
+                </button>
+                
+                <button class="payment-button bnpl-button" onclick="handleBNPLPayment()">
+                    📅 Buy Now, Pay Later
+                    <div class="payment-subtext">Affirm, Klarna, Afterpay</div>
+                </button>
+                
+                <button class="payment-button regional-button" onclick="handleRegionalPayment()">
+                    🌏 Regional Payments
+                    <div class="payment-subtext">Alipay, WeChat Pay, etc.</div>
+                </button>
             </div>
             
             <button class="refresh-button" onclick="refreshStatus()">
@@ -346,6 +373,57 @@
             } catch (error) {
                 updateModal('Connection Error', `Could not connect to backend: ${error.message}`);
             }
+        }
+        
+        async function handleWalletPayment() {
+            showModal('Mobile Wallet Payment', 'Connecting to wallet providers...');
+            
+            setTimeout(() => {
+                updateModal('Wallet Payment Success!', 
+                    `Mock wallet payment processed!<br><br>
+                    Provider: Apple Pay<br>
+                    Transaction ID: wallet_${Date.now()}<br>
+                    Status: Authorized ✅`);
+                
+                setTimeout(() => {
+                    activateSubscription();
+                    closeModal();
+                }, 3000);
+            }, 2000);
+        }
+        
+        async function handleBNPLPayment() {
+            showModal('Buy Now, Pay Later', 'Setting up installment plan...');
+            
+            setTimeout(() => {
+                updateModal('BNPL Plan Created!', 
+                    `Mock BNPL plan activated!<br><br>
+                    Provider: Affirm<br>
+                    Plan: 4 payments of $7.50<br>
+                    First payment: Today ✅`);
+                
+                setTimeout(() => {
+                    activateSubscription();
+                    closeModal();
+                }, 3000);
+            }, 2000);
+        }
+        
+        async function handleRegionalPayment() {
+            showModal('Regional Payment', 'Connecting to regional providers...');
+            
+            setTimeout(() => {
+                updateModal('Regional Payment Success!', 
+                    `Mock regional payment processed!<br><br>
+                    Provider: Alipay<br>
+                    Transaction ID: alipay_${Date.now()}<br>
+                    Status: Completed ✅`);
+                
+                setTimeout(() => {
+                    activateSubscription();
+                    closeModal();
+                }, 3000);
+            }, 2000);
         }
         
         function activateSubscription() {
