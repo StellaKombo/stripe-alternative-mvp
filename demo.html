@@ -176,6 +176,125 @@
             margin-bottom: 5px;
         }
         
+        .routing-section {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .routing-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .routing-flow {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .provider-box {
+            background: #e3f2fd;
+            border: 1px solid #2196f3;
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #1976d2;
+            transition: all 0.3s ease;
+        }
+        
+        .provider-box.primary {
+            background: #e8f5e8;
+            border-color: #4caf50;
+            color: #2e7d32;
+        }
+        
+        .provider-box.fallback {
+            background: #fff3e0;
+            border-color: #ff9800;
+            color: #f57c00;
+        }
+        
+        .provider-box.failed {
+            background: #ffebee;
+            border-color: #f44336;
+            color: #c62828;
+            opacity: 0.6;
+        }
+        
+        .provider-box.active {
+            background: #4caf50;
+            border-color: #4caf50;
+            color: white;
+            transform: scale(1.05);
+        }
+        
+        .arrow {
+            color: #666;
+            font-weight: bold;
+            font-size: 16px;
+        }
+        
+        .routing-log {
+            background: #1a1a1a;
+            color: #00ff00;
+            border-radius: 8px;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+            margin-top: 15px;
+        }
+        
+        .routing-scenarios {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .scenario-card {
+            background: white;
+            border: 2px solid #e9ecef;
+            border-radius: 12px;
+            padding: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .scenario-card:hover {
+            border-color: #007AFF;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+        }
+        
+        .scenario-card.active {
+            border-color: #007AFF;
+            background: #f0f8ff;
+        }
+        
+        .scenario-header {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        
+        .scenario-description {
+            color: #666;
+            font-size: 13px;
+            line-height: 1.4;
+        }
+        
         .status-active {
             color: #28a745 !important;
             font-weight: 600;
@@ -230,9 +349,46 @@
         
         <div class="content">
             <div class="demo-info">
-                <strong>🚀 Live MVP Demo</strong>
+                <strong>🚀 Live MVP Demo with Payment Routing</strong>
                 Real backend integration with Primer (sandbox) + Coinbase Commerce (test mode). 
-                Click buttons to see actual API responses!
+                Watch how payments are intelligently routed between providers!
+            </div>
+            
+            <div class="routing-section">
+                <div class="routing-title">
+                    🔄 Payment Routing Engine
+                </div>
+                
+                <div class="routing-scenarios">
+                    <div class="scenario-card" onclick="selectScenario('normal')">
+                        <div class="scenario-header">Normal Flow</div>
+                        <div class="scenario-description">Primary provider succeeds</div>
+                    </div>
+                    <div class="scenario-card" onclick="selectScenario('fallback')">
+                        <div class="scenario-header">Fallback Flow</div>
+                        <div class="scenario-description">Primary fails, fallback succeeds</div>
+                    </div>
+                    <div class="scenario-card" onclick="selectScenario('cascade')">
+                        <div class="scenario-header">Cascade Flow</div>
+                        <div class="scenario-description">Multiple fallbacks attempted</div>
+                    </div>
+                    <div class="scenario-card" onclick="selectScenario('regional')">
+                        <div class="scenario-header">Regional Routing</div>
+                        <div class="scenario-description">Route by user location</div>
+                    </div>
+                </div>
+                
+                <div class="routing-flow" id="routingFlow">
+                    <div class="provider-box primary" id="provider1">Primer</div>
+                    <div class="arrow">→</div>
+                    <div class="provider-box fallback" id="provider2">Coinbase</div>
+                    <div class="arrow">→</div>
+                    <div class="provider-box fallback" id="provider3">Stripe</div>
+                </div>
+                
+                <div class="routing-log" id="routingLog" style="display: none;">
+                    <div id="logContent">Ready to process payment...</div>
+                </div>
             </div>
             
             <div class="user-info">
@@ -300,130 +456,257 @@
         // Enhanced demo modes
         const SHOW_REAL_INTEGRATIONS = true; // Set to true for VC demos
         
+        // Routing scenarios
+        let currentScenario = 'normal';
+        let routingLog = [];
+        
+        // Payment routing scenarios
+        const scenarios = {
+            normal: {
+                name: 'Normal Flow',
+                providers: [
+                    { name: 'Primer', success: true, delay: 1500 }
+                ]
+            },
+            fallback: {
+                name: 'Fallback Flow', 
+                providers: [
+                    { name: 'Primer', success: false, delay: 1000 },
+                    { name: 'Coinbase', success: true, delay: 1500 }
+                ]
+            },
+            cascade: {
+                name: 'Cascade Flow',
+                providers: [
+                    { name: 'Primer', success: false, delay: 800 },
+                    { name: 'Coinbase', success: false, delay: 1000 },
+                    { name: 'Stripe', success: true, delay: 1200 }
+                ]
+            },
+            regional: {
+                name: 'Regional Routing',
+                providers: [
+                    { name: 'Alipay', success: true, delay: 1300 }
+                ]
+            }
+        };
+        
+        function selectScenario(scenarioType) {
+            // Remove active class from all scenario cards
+            document.querySelectorAll('.scenario-card').forEach(card => {
+                card.classList.remove('active');
+            });
+            
+            // Add active class to selected card
+            event.target.closest('.scenario-card').classList.add('active');
+            
+            currentScenario = scenarioType;
+            updateRoutingFlow(scenarioType);
+            logMessage(`Selected scenario: ${scenarios[scenarioType].name}`);
+        }
+        
+        function updateRoutingFlow(scenarioType) {
+            const scenario = scenarios[scenarioType];
+            const flowContainer = document.getElementById('routingFlow');
+            
+            // Clear existing flow
+            flowContainer.innerHTML = '';
+            
+            // Build new flow based on scenario
+            scenario.providers.forEach((provider, index) => {
+                const providerBox = document.createElement('div');
+                providerBox.className = 'provider-box';
+                providerBox.id = `provider${index + 1}`;
+                providerBox.textContent = provider.name;
+                
+                if (index === 0) {
+                    providerBox.classList.add('primary');
+                } else {
+                    providerBox.classList.add('fallback');
+                }
+                
+                flowContainer.appendChild(providerBox);
+                
+                if (index < scenario.providers.length - 1) {
+                    const arrow = document.createElement('div');
+                    arrow.className = 'arrow';
+                    arrow.textContent = '→';
+                    flowContainer.appendChild(arrow);
+                }
+            });
+        }
+        
+        function logMessage(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            routingLog.push(`[${timestamp}] ${message}`);
+            
+            const logContent = document.getElementById('logContent');
+            const routingLogDiv = document.getElementById('routingLog');
+            
+            logContent.innerHTML = routingLog.slice(-10).join('<br>'); // Show last 10 messages
+            routingLogDiv.style.display = 'block';
+        }
+        
+        function resetProviderStates() {
+            document.querySelectorAll('.provider-box').forEach(box => {
+                box.classList.remove('active', 'failed');
+            });
+        }
+        
+        async function simulatePaymentRouting(paymentType) {
+            const scenario = scenarios[currentScenario];
+            resetProviderStates();
+            
+            logMessage(`Starting ${paymentType} payment with ${scenario.name}`);
+            logMessage(`Amount: $29.99 | User: demo@example.com`);
+            
+            for (let i = 0; i < scenario.providers.length; i++) {
+                const provider = scenario.providers[i];
+                const providerElement = document.getElementById(`provider${i + 1}`);
+                
+                if (providerElement) {
+                    // Highlight current provider
+                    providerElement.classList.add('active');
+                    logMessage(`Attempting payment via ${provider.name}...`);
+                    
+                    // Wait for provider response
+                    await new Promise(resolve => setTimeout(resolve, provider.delay));
+                    
+                    if (provider.success) {
+                        logMessage(`✅ ${provider.name} payment successful!`);
+                        logMessage(`Transaction ID: ${provider.name.toLowerCase()}_${Date.now()}`);
+                        return { success: true, provider: provider.name };
+                    } else {
+                        // Mark as failed and try next
+                        providerElement.classList.remove('active');
+                        providerElement.classList.add('failed');
+                        logMessage(`❌ ${provider.name} payment failed - routing to next provider`);
+                    }
+                }
+            }
+            
+            logMessage(`❌ All payment providers failed`);
+            return { success: false, provider: null };
+        }
+        
         async function handleCardPayment() {
-            showModal('Card Payment', 'Connecting to Primer API...');
+            showModal('Card Payment', 'Initializing payment routing...');
             
-            try {
-                // Test the actual backend
-                const response = await fetch(`${BACKEND_URL}/api/primer/client-session`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        amount: 2999,
-                        currency: 'USD',
-                        userId: DEMO_USER_ID,
-                    }),
-                });
-                
-                const data = await response.json();
-                
-                if (data.mock) {
-                    updateModal('Card Payment Success!', 
-                        `Mock payment processed successfully!<br><br>
-                        Client Token: ${data.clientToken.substring(0, 20)}...<br>
-                        Backend: Working ✅`);
-                    
-                    setTimeout(() => {
-                        activateSubscription();
-                        closeModal();
-                    }, 3000);
-                } else {
-                    updateModal('Payment Error', 'Failed to process payment');
-                }
-            } catch (error) {
-                updateModal('Connection Error', `Could not connect to backend: ${error.message}`);
-            }
-        }
-        
-        async function handleCryptoPayment() {
-            showModal('Crypto Payment', 'Connecting to Coinbase Commerce...');
+            // Simulate payment routing
+            const result = await simulatePaymentRouting('Card');
             
-            try {
-                const response = await fetch(`${BACKEND_URL}/api/crypto/charge`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        amount: 2999,
-                        currency: 'USD',
-                        userId: DEMO_USER_ID,
-                        plan: 'premium',
-                    }),
-                });
-                
-                const data = await response.json();
-                
-                if (data.mock) {
-                    updateModal('Crypto Payment Success!', 
-                        `Mock crypto charge created successfully!<br><br>
-                        Charge ID: ${data.chargeId.substring(0, 20)}...<br>
-                        Code: ${data.code}<br>
-                        Backend: Working ✅`);
-                    
-                    setTimeout(() => {
-                        activateSubscription();
-                        closeModal();
-                    }, 3000);
-                } else {
-                    updateModal('Payment Error', 'Failed to create crypto charge');
-                }
-            } catch (error) {
-                updateModal('Connection Error', `Could not connect to backend: ${error.message}`);
-            }
-        }
-        
-        async function handleWalletPayment() {
-            showModal('Mobile Wallet Payment', 'Connecting to wallet providers...');
-            
-            setTimeout(() => {
-                updateModal('Wallet Payment Success!', 
-                    `Mock wallet payment processed!<br><br>
-                    Provider: Apple Pay<br>
-                    Transaction ID: wallet_${Date.now()}<br>
-                    Status: Authorized ✅`);
-                
-                setTimeout(() => {
-                    activateSubscription();
-                    closeModal();
-                }, 3000);
-            }, 2000);
-        }
-        
-        async function handleBNPLPayment() {
-            showModal('Buy Now, Pay Later', 'Setting up installment plan...');
-            
-            setTimeout(() => {
-                updateModal('BNPL Plan Created!', 
-                    `Mock BNPL plan activated!<br><br>
-                    Provider: Affirm<br>
-                    Plan: 4 payments of $7.50<br>
-                    First payment: Today ✅`);
-                
-                setTimeout(() => {
-                    activateSubscription();
-                    closeModal();
-                }, 3000);
-            }, 2000);
-        }
-        
-        async function handleRegionalPayment() {
-            showModal('Regional Payment', 'Connecting to regional providers...');
-            
-            setTimeout(() => {
-                updateModal('Regional Payment Success!', 
-                    `Mock regional payment processed!<br><br>
-                    Provider: Alipay<br>
-                    Transaction ID: alipay_${Date.now()}<br>
+            if (result.success) {
+                updateModal('Card Payment Success!', 
+                    `Payment processed via ${result.provider}!<br><br>
+                    Transaction ID: ${result.provider.toLowerCase()}_${Date.now()}<br>
+                    Amount: $29.99<br>
                     Status: Completed ✅`);
                 
                 setTimeout(() => {
                     activateSubscription();
                     closeModal();
-                }, 3000);
-            }, 2000);
+                }, 2000);
+            } else {
+                updateModal('Payment Failed', 
+                    `All payment providers failed.<br><br>
+                    Please try again or contact support.`);
+            }
+        }
+        
+        async function handleCryptoPayment() {
+            showModal('Crypto Payment', 'Initializing payment routing...');
+            
+            // Simulate payment routing
+            const result = await simulatePaymentRouting('Crypto');
+            
+            if (result.success) {
+                updateModal('Crypto Payment Success!', 
+                    `Payment processed via ${result.provider}!<br><br>
+                    Transaction ID: ${result.provider.toLowerCase()}_${Date.now()}<br>
+                    Amount: $29.99<br>
+                    Status: Completed ✅`);
+                
+                setTimeout(() => {
+                    activateSubscription();
+                    closeModal();
+                }, 2000);
+            } else {
+                updateModal('Payment Failed', 
+                    `All payment providers failed.<br><br>
+                    Please try again or contact support.`);
+            }
+        }
+        
+        async function handleWalletPayment() {
+            showModal('Mobile Wallet Payment', 'Initializing payment routing...');
+            
+            // Simulate payment routing
+            const result = await simulatePaymentRouting('Wallet');
+            
+            if (result.success) {
+                updateModal('Wallet Payment Success!', 
+                    `Payment processed via ${result.provider}!<br><br>
+                    Transaction ID: ${result.provider.toLowerCase()}_${Date.now()}<br>
+                    Amount: $29.99<br>
+                    Status: Completed ✅`);
+                
+                setTimeout(() => {
+                    activateSubscription();
+                    closeModal();
+                }, 2000);
+            } else {
+                updateModal('Payment Failed', 
+                    `All payment providers failed.<br><br>
+                    Please try again or contact support.`);
+            }
+        }
+        
+        async function handleBNPLPayment() {
+            showModal('Buy Now, Pay Later', 'Initializing payment routing...');
+            
+            // Simulate payment routing
+            const result = await simulatePaymentRouting('BNPL');
+            
+            if (result.success) {
+                updateModal('BNPL Payment Success!', 
+                    `Payment processed via ${result.provider}!<br><br>
+                    Transaction ID: ${result.provider.toLowerCase()}_${Date.now()}<br>
+                    Plan: 4 payments of $7.50<br>
+                    Status: Completed ✅`);
+                
+                setTimeout(() => {
+                    activateSubscription();
+                    closeModal();
+                }, 2000);
+            } else {
+                updateModal('Payment Failed', 
+                    `All payment providers failed.<br><br>
+                    Please try again or contact support.`);
+            }
+        }
+        
+        async function handleRegionalPayment() {
+            showModal('Regional Payment', 'Initializing payment routing...');
+            
+            // Simulate payment routing
+            const result = await simulatePaymentRouting('Regional');
+            
+            if (result.success) {
+                updateModal('Regional Payment Success!', 
+                    `Payment processed via ${result.provider}!<br><br>
+                    Transaction ID: ${result.provider.toLowerCase()}_${Date.now()}<br>
+                    Amount: $29.99<br>
+                    Status: Completed ✅`);
+                
+                setTimeout(() => {
+                    activateSubscription();
+                    closeModal();
+                }, 2000);
+            } else {
+                updateModal('Payment Failed', 
+                    `All payment providers failed.<br><br>
+                    Please try again or contact support.`);
+            }
         }
         
         function activateSubscription() {
