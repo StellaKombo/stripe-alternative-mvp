@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Compliance Demo</title>
+<style>
+  body { font-family: Arial, sans-serif; margin: 20px; background: #f9f9f9; }
+  h1 { color: #333; }
+  input, button { padding: 8px; margin: 5px 0; width: 100%; }
+  .section { background: white; padding: 20px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+  pre { background: #eee; padding: 10px; border-radius: 5px; overflow-x: auto; }
+</style>
+</head>
+<body>
+
+<h1>Compliance Demo</h1>
+
+<div class="section">
+  <h2>1. Create Merchant</h2>
+  <input type="text" id="merchantName" placeholder="Merchant Name">
+  <input type="text" id="merchantType" placeholder="Business Type (e.g., Adult Content)">
+  <input type="text" id="merchantCountry" placeholder="Country (ISO2)">
+  <input type="text" id="merchantWebsite" placeholder="Website URL">
+  <button onclick="createMerchant()">Create Merchant</button>
+  <pre id="merchantResult">Merchant ID will appear here</pre>
+</div>
+
+<div class="section">
+  <h2>2. Upload Document</h2>
+  <input type="text" id="docMerchantId" placeholder="Merchant ID">
+  <input type="text" id="docType" placeholder="Document Type (e.g., ID, Business License)">
+  <input type="text" id="docPath" placeholder="Document Path or URL">
+  <button onclick="uploadDocument()">Upload Document</button>
+  <pre id="docResult">Upload result will appear here</pre>
+</div>
+
+<div class="section">
+  <h2>3. Get Risk Profile</h2>
+  <input type="text" id="riskMerchantId" placeholder="Merchant ID">
+  <button onclick="getRiskProfile()">Get Risk Profile</button>
+  <pre id="riskResult">Risk profile will appear here</pre>
+</div>
+
+<script>
+const BACKEND_URL = "https://stripe-alt-backend-d8czhwstayhp.deno.dev"; // Your Deno backend
+
+async function createMerchant() {
+  const name = document.getElementById('merchantName').value;
+  const type = document.getElementById('merchantType').value;
+  const country = document.getElementById('merchantCountry').value;
+  const website = document.getElementById('merchantWebsite').value;
+
+  try {
+    const res = await fetch(`${BACKEND_URL}/merchants`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, business_type: type, country, website })
+    });
+    const data = await res.json();
+    document.getElementById('merchantResult').textContent = JSON.stringify(data, null, 2);
+  } catch (err) {
+    document.getElementById('merchantResult').textContent = err.message;
+  }
+}
+
+async function uploadDocument() {
+  const merchantId = document.getElementById('docMerchantId').value;
+  const docType = document.getElementById('docType').value;
+  const storagePath = document.getElementById('docPath').value;
+
+  try {
+    const res = await fetch(`${BACKEND_URL}/merchants/${merchantId}/documents`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ doc_type: docType, storage_path: storagePath })
+    });
+    const data = await res.json();
+    document.getElementById('docResult').textContent = JSON.stringify(data, null, 2);
+  } catch (err) {
+    document.getElementById('docResult').textContent = err.message;
+  }
+}
+
+async function getRiskProfile() {
+  const merchantId = document.getElementById('riskMerchantId').value;
+  try {
+    const res = await fetch(`${BACKEND_URL}/risk/${merchantId}`);
+    const data = await res.json();
+    document.getElementById('riskResult').textContent = JSON.stringify(data, null, 2);
+  } catch (err) {
+    document.getElementById('riskResult').textContent = err.message;
+  }
+}
+</script>
+
+</body>
+</html>
