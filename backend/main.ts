@@ -21,8 +21,8 @@ const SUPABASE_MOCK_MODE = !Deno.env.get("SUPABASE_URL") || Deno.env.get("SUPABA
 // Enhanced demo mode - shows real API responses when possible
 const ENHANCED_DEMO_MODE = true;
 
-// Initialize Supabase client with service role key
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+// Initialize Supabase client with service role key (or mock)
+const supabase = SUPABASE_MOCK_MODE ? null : createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 // CORS headers
 const corsHeaders = {
@@ -373,6 +373,53 @@ async function handlePrimerWebhook(request: Request): Promise<Response> {
   }
 }
 
+async function handleDemoActivateSubscription(request: Request): Promise<Response> {
+  try {
+    const { userId } = await request.json();
+
+    if (SUPABASE_MOCK_MODE) {
+      return new Response(JSON.stringify({
+        success: true,
+        mock: true,
+        message: "Mock subscription activation - set SUPABASE_URL for real database integration"
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Create or update subscription in Supabase
+    const { error: subError } = await supabase
+      .from("subscriptions")
+      .upsert({
+        user_id: userId,
+        plan: "premium",
+        status: "active",
+        current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      });
+
+    if (subError) {
+      console.error("Subscription activation error:", subError);
+      throw new Error(`Database error: ${subError.message}`);
+    }
+
+    return new Response(JSON.stringify({
+      success: true,
+      status: "active",
+      current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      message: "Subscription activated successfully"
+    }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } catch (error) {
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+}
+
 async function handleCoinbaseWebhook(request: Request): Promise<Response> {
   try {
     const payload = await request.text();
@@ -451,6 +498,9 @@ async function handler(request: Request): Promise<Response> {
     
     case "/api/webhooks/coinbase":
       return handleCoinbaseWebhook(request);
+    
+    case "/api/demo/activate-subscription":
+      return handleDemoActivateSubscription(request);
     
     default:
       return new Response("Not Found", { status: 404 });
