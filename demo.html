@@ -218,8 +218,9 @@
         
         <div class="content">
             <div class="demo-info">
-                <strong>🎭 Demo Mode Active</strong>
-                This is a working demo of your Stripe Alternative MVP with mock payment processing.
+                <strong>🚀 Live MVP Demo</strong>
+                Real backend integration with Primer (sandbox) + Coinbase Commerce (test mode). 
+                Click buttons to see actual API responses!
             </div>
             
             <div class="user-info">
@@ -268,6 +269,9 @@
     <script>
         const BACKEND_URL = 'https://stripe-alt-backend-d8czhwstayhp.deno.dev';
         const DEMO_USER_ID = '550e8400-e29b-41d4-a716-446655440000';
+        
+        // Enhanced demo modes
+        const SHOW_REAL_INTEGRATIONS = true; // Set to true for VC demos
         
         async function handleCardPayment() {
             showModal('Card Payment', 'Connecting to Primer API...');
