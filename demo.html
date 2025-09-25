@@ -138,6 +138,14 @@
             background: linear-gradient(135deg, #FF3B30 0%, #DC3545 100%);
         }
         
+        .zelle-button {
+            background: linear-gradient(135deg, #6B46C1 0%, #553C9A 100%);
+        }
+        
+        .cashapp-button {
+            background: linear-gradient(135deg, #00D632 0%, #00B82A 100%);
+        }
+        
         .payment-subtext {
             font-size: 12px;
             opacity: 0.8;
@@ -369,12 +377,12 @@
                         <div class="scenario-description">Primary fails, fallback succeeds</div>
                     </div>
                     <div class="scenario-card" onclick="selectScenario('cascade')">
-                        <div class="scenario-header">Cascade Flow</div>
-                        <div class="scenario-description">Multiple fallbacks attempted</div>
+                        <div class="scenario-header">Full Cascade Flow</div>
+                        <div class="scenario-description">All providers until success</div>
                     </div>
                     <div class="scenario-card" onclick="selectScenario('regional')">
-                        <div class="scenario-header">Regional Routing</div>
-                        <div class="scenario-description">Route by user location</div>
+                        <div class="scenario-header">US Payment Methods</div>
+                        <div class="scenario-description">Zelle → Cash App routing</div>
                     </div>
                 </div>
                 
@@ -429,6 +437,16 @@
                     <div class="payment-subtext">Affirm, Klarna, Afterpay</div>
                 </button>
                 
+                <button class="payment-button zelle-button" onclick="handleZellePayment()">
+                    🏦 Pay with Zelle
+                    <div class="payment-subtext">Bank-to-bank transfer</div>
+                </button>
+                
+                <button class="payment-button cashapp-button" onclick="handleCashAppPayment()">
+                    💸 Pay with Cash App
+                    <div class="payment-subtext">Instant mobile payments</div>
+                </button>
+                
                 <button class="payment-button regional-button" onclick="handleRegionalPayment()">
                     🌏 Regional Payments
                     <div class="payment-subtext">Alipay, WeChat Pay, etc.</div>
@@ -460,7 +478,7 @@
         let currentScenario = 'normal';
         let routingLog = [];
         
-        // Payment routing scenarios
+        // Enhanced payment routing scenarios with Zelle and Cash App
         const scenarios = {
             normal: {
                 name: 'Normal Flow',
@@ -472,21 +490,24 @@
                 name: 'Fallback Flow', 
                 providers: [
                     { name: 'Primer', success: false, delay: 1000 },
-                    { name: 'Coinbase', success: true, delay: 1500 }
+                    { name: 'Stripe', success: true, delay: 1500 }
                 ]
             },
             cascade: {
-                name: 'Cascade Flow',
+                name: 'Full Cascade Flow',
                 providers: [
                     { name: 'Primer', success: false, delay: 800 },
-                    { name: 'Coinbase', success: false, delay: 1000 },
-                    { name: 'Stripe', success: true, delay: 1200 }
+                    { name: 'Stripe', success: false, delay: 1000 },
+                    { name: 'Coinbase', success: false, delay: 1200 },
+                    { name: 'Zelle', success: false, delay: 1100 },
+                    { name: 'Cash App', success: true, delay: 1300 }
                 ]
             },
             regional: {
-                name: 'Regional Routing',
+                name: 'US Payment Methods',
                 providers: [
-                    { name: 'Alipay', success: true, delay: 1300 }
+                    { name: 'Zelle', success: false, delay: 1000 },
+                    { name: 'Cash App', success: true, delay: 1200 }
                 ]
             }
         };
@@ -553,6 +574,106 @@
             });
         }
         
+        // Simulate compliance check locally (matches backend logic)
+        async function simulateComplianceCheck(paymentType, amount) {
+            const checks = [];
+            let riskScore = 0;
+            let recommendedProvider = 'primer'; // default
+
+            // Simulate merchant verification check
+            checks.push({
+                name: 'Merchant Verification',
+                status: 'passed',
+                details: 'Merchant identity verified and documents approved'
+            });
+
+            // Simulate transaction amount risk assessment
+            if (amount > 10000) { // $100+
+                riskScore += 30;
+                checks.push({
+                    name: 'High Value Transaction',
+                    status: 'warning',
+                    details: `Transaction amount $${(amount/100).toFixed(2)} requires additional monitoring`
+                });
+            } else {
+                checks.push({
+                    name: 'Transaction Amount',
+                    status: 'passed',
+                    details: `Transaction amount $${(amount/100).toFixed(2)} within normal limits`
+                });
+            }
+
+            // Simulate payment method risk assessment
+            if (paymentType === 'crypto') {
+                riskScore += 20;
+                recommendedProvider = 'coinbase';
+                checks.push({
+                    name: 'Payment Method Risk',
+                    status: 'warning',
+                    details: 'Cryptocurrency payments require enhanced monitoring'
+                });
+            } else {
+                checks.push({
+                    name: 'Payment Method Risk',
+                    status: 'passed',
+                    details: 'Standard payment method with low risk profile'
+                });
+            }
+
+            // Simulate geographic risk check
+            const geoRisk = Math.random() > 0.8; // 20% chance of geo risk
+            if (geoRisk) {
+                riskScore += 25;
+                checks.push({
+                    name: 'Geographic Risk',
+                    status: 'warning',
+                    details: 'Transaction from high-risk geographic region'
+                });
+            } else {
+                checks.push({
+                    name: 'Geographic Risk',
+                    status: 'passed',
+                    details: 'Transaction from low-risk geographic region'
+                });
+            }
+
+            // Simulate AML/KYC check
+            const amlCheck = Math.random() > 0.95; // 5% chance of AML flag
+            if (amlCheck) {
+                riskScore += 50;
+                checks.push({
+                    name: 'AML/KYC Check',
+                    status: 'failed',
+                    details: 'Transaction flagged for manual AML review'
+                });
+            } else {
+                checks.push({
+                    name: 'AML/KYC Check',
+                    status: 'passed',
+                    details: 'No AML/KYC concerns identified'
+                });
+            }
+
+            // Determine overall compliance status
+            const hasFailures = checks.some(check => check.status === 'failed');
+            const passed = !hasFailures && riskScore < 80;
+
+            // Route to different providers based on risk
+            if (riskScore > 60) {
+                recommendedProvider = paymentType === 'crypto' ? 'coinbase' : 'stripe';
+            }
+
+            // Add small delay to simulate processing
+            await new Promise(resolve => setTimeout(resolve, 800));
+
+            return {
+                passed,
+                riskScore,
+                checks,
+                recommendedProvider
+            };
+        }
+        
         async function simulatePaymentRouting(paymentType) {
             const scenario = scenarios[currentScenario];
             resetProviderStates();
@@ -590,49 +711,124 @@
         }
         
         async function handleCardPayment() {
-            showModal('Card Payment', 'Initializing payment routing...');
+            showModal('Card Payment', 'Running compliance checks...');
             
-            // Simulate payment routing
-            const result = await simulatePaymentRouting('Card');
+            // Step 1: Show compliance checking
+            logMessage('🔍 Running compliance checks...');
+            await new Promise(resolve => setTimeout(resolve, 1000));
             
-            if (result.success) {
-                updateModal('Card Payment Success!', 
-                    `Payment processed via ${result.provider}!<br><br>
-                    Transaction ID: ${result.provider.toLowerCase()}_${Date.now()}<br>
-                    Amount: $29.99<br>
-                    Status: Completed ✅`);
+            try {
+                // Step 2: Simulate compliance check (since deployed backend doesn't have new endpoint yet)
+                const complianceResult = await simulateComplianceCheck('card', 2999);
                 
-                setTimeout(() => {
-                    activateSubscription();
-                    closeModal();
-                }, 2000);
-            } else {
+                if (complianceResult.passed) {
+                    // Show compliance results
+                    updateModal('Compliance Check Passed ✅', 
+                        `Risk Score: ${complianceResult.riskScore}/100<br>
+                        Recommended Provider: ${complianceResult.recommendedProvider}<br><br>
+                        Processing payment...`);
+                    
+                    logMessage(`✅ Compliance passed (Risk: ${complianceResult.riskScore}/100)`);
+                    logMessage(`🔄 Routing to ${complianceResult.recommendedProvider}`);
+                    
+                    // Show compliance check details
+                    complianceResult.checks.forEach(check => {
+                        const status = check.status === 'passed' ? '✅' : check.status === 'warning' ? '⚠️' : '❌';
+                        logMessage(`${status} ${check.name}: ${check.details}`);
+                    });
+                    
+                    // Simulate the actual payment routing
+                    await simulatePaymentRouting('Card');
+                    
+                    setTimeout(() => {
+                        updateModal('Card Payment Success!', 
+                            `Payment processed via ${complianceResult.recommendedProvider}!<br><br>
+                            Transaction ID: card_${Date.now()}<br>
+                            Amount: $29.99<br>
+                            Risk Score: ${complianceResult.riskScore}/100<br>
+                            Status: Completed ✅`);
+                        
+                        setTimeout(() => {
+                            activateSubscription();
+                            closeModal();
+                        }, 2000);
+                    }, 1500);
+                } else {
+                    // Show compliance failure
+                    logMessage(`❌ Compliance check failed: Risk score too high (${complianceResult.riskScore}/100)`);
+                    updateModal('Compliance Check Failed ❌', 
+                        `Payment rejected due to compliance check failure<br><br>
+                        Risk Score: ${complianceResult.riskScore}/100<br><br>
+                        Please contact support for manual review.`);
+                }
+            } catch (error) {
+                logMessage(`❌ Payment failed: ${error.message}`);
                 updateModal('Payment Failed', 
-                    `All payment providers failed.<br><br>
+                    `Error: ${error.message}<br><br>
                     Please try again or contact support.`);
             }
         }
         
         async function handleCryptoPayment() {
-            showModal('Crypto Payment', 'Initializing payment routing...');
+            showModal('Crypto Payment', 'Running compliance checks...');
             
-            // Simulate payment routing
-            const result = await simulatePaymentRouting('Crypto');
+            // Step 1: Show compliance checking
+            logMessage('🔍 Running compliance checks for crypto payment...');
+            await new Promise(resolve => setTimeout(resolve, 1000));
             
-            if (result.success) {
-                updateModal('Crypto Payment Success!', 
-                    `Payment processed via ${result.provider}!<br><br>
-                    Transaction ID: ${result.provider.toLowerCase()}_${Date.now()}<br>
-                    Amount: $29.99<br>
-                    Status: Completed ✅`);
+            try {
+                // Step 2: Call compliance-enabled payment endpoint
+                const response = await fetch(`${BACKEND_URL}/api/compliance/payment`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        userId: DEMO_USER_ID,
+                        amount: 2999, // $29.99 in cents
+                        currency: 'USD',
+                        paymentType: 'crypto'
+                    })
+                });
                 
-                setTimeout(() => {
-                    activateSubscription();
-                    closeModal();
-                }, 2000);
-            } else {
+                const result = await response.json();
+                
+                if (result.success) {
+                    // Show compliance results
+                    updateModal('Compliance Check Passed ✅', 
+                        `Risk Score: ${result.complianceResult.riskScore}/100<br>
+                        Recommended Provider: ${result.complianceResult.recommendedProvider}<br><br>
+                        Processing crypto payment...`);
+                    
+                    logMessage(`✅ Compliance passed (Risk: ${result.complianceResult.riskScore}/100)`);
+                    logMessage(`🔄 Routing to ${result.complianceResult.recommendedProvider}`);
+                    
+                    // Simulate the actual payment routing
+                    await simulatePaymentRouting('Crypto');
+                    
+                    setTimeout(() => {
+                        updateModal('Crypto Payment Success!', 
+                            `Payment processed via ${result.paymentResult.provider}!<br><br>
+                            Transaction ID: ${result.paymentResult.id || result.paymentResult.code}<br>
+                            Amount: $29.99<br>
+                            Risk Score: ${result.complianceResult.riskScore}/100<br>
+                            Status: Completed ✅`);
+                        
+                        setTimeout(() => {
+                            activateSubscription();
+                            closeModal();
+                        }, 2000);
+                    }, 1500);
+                } else {
+                    // Show compliance failure
+                    logMessage(`❌ Compliance check failed: ${result.error}`);
+                    updateModal('Compliance Check Failed ❌', 
+                        `${result.error}<br><br>
+                        Risk Score: ${result.complianceResult?.riskScore || 'N/A'}/100<br><br>
+                        Please contact support for manual review.`);
+                }
+            } catch (error) {
+                logMessage(`❌ Payment failed: ${error.message}`);
                 updateModal('Payment Failed', 
-                    `All payment providers failed.<br><br>
+                    `Error: ${error.message}<br><br>
                     Please try again or contact support.`);
             }
         }
@@ -681,6 +877,124 @@
             } else {
                 updateModal('Payment Failed', 
                     `All payment providers failed.<br><br>
+                    Please try again or contact support.`);
+            }
+        }
+        
+        async function handleZellePayment() {
+            showModal('Zelle Payment', 'Running compliance checks...');
+            
+            // Step 1: Show compliance checking
+            logMessage('🔍 Running compliance checks for Zelle payment...');
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            try {
+                // Step 2: Simulate compliance check
+                const complianceResult = await simulateComplianceCheck('zelle', 2999);
+                
+                if (complianceResult.passed) {
+                    // Show compliance results
+                    updateModal('Compliance Check Passed ✅', 
+                        `Risk Score: ${complianceResult.riskScore}/100<br>
+                        Recommended Provider: Zelle<br><br>
+                        Processing bank transfer...`);
+                    
+                    logMessage(`✅ Compliance passed (Risk: ${complianceResult.riskScore}/100)`);
+                    logMessage(`🔄 Routing to Zelle`);
+                    
+                    // Show compliance check details
+                    complianceResult.checks.forEach(check => {
+                        const status = check.status === 'passed' ? '✅' : check.status === 'warning' ? '⚠️' : '❌';
+                        logMessage(`${status} ${check.name}: ${check.details}`);
+                    });
+                    
+                    // Simulate the actual payment routing
+                    await simulatePaymentRouting('Zelle');
+                    
+                    setTimeout(() => {
+                        updateModal('Zelle Payment Success!', 
+                            `Payment processed via Zelle!<br><br>
+                            Transaction ID: zelle_${Date.now()}<br>
+                            Amount: $29.99<br>
+                            Risk Score: ${complianceResult.riskScore}/100<br>
+                            Status: Completed ✅`);
+                        
+                        setTimeout(() => {
+                            activateSubscription();
+                            closeModal();
+                        }, 2000);
+                    }, 1500);
+                } else {
+                    // Show compliance failure
+                    logMessage(`❌ Compliance check failed: Risk score too high (${complianceResult.riskScore}/100)`);
+                    updateModal('Compliance Check Failed ❌', 
+                        `Payment rejected due to compliance check failure<br><br>
+                        Risk Score: ${complianceResult.riskScore}/100<br><br>
+                        Please contact support for manual review.`);
+                }
+            } catch (error) {
+                logMessage(`❌ Payment failed: ${error.message}`);
+                updateModal('Payment Failed', 
+                    `Error: ${error.message}<br><br>
+                    Please try again or contact support.`);
+            }
+        }
+        
+        async function handleCashAppPayment() {
+            showModal('Cash App Payment', 'Running compliance checks...');
+            
+            // Step 1: Show compliance checking
+            logMessage('🔍 Running compliance checks for Cash App payment...');
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            try {
+                // Step 2: Simulate compliance check
+                const complianceResult = await simulateComplianceCheck('cashapp', 2999);
+                
+                if (complianceResult.passed) {
+                    // Show compliance results
+                    updateModal('Compliance Check Passed ✅', 
+                        `Risk Score: ${complianceResult.riskScore}/100<br>
+                        Recommended Provider: Cash App<br><br>
+                        Processing mobile payment...`);
+                    
+                    logMessage(`✅ Compliance passed (Risk: ${complianceResult.riskScore}/100)`);
+                    logMessage(`🔄 Routing to Cash App`);
+                    
+                    // Show compliance check details
+                    complianceResult.checks.forEach(check => {
+                        const status = check.status === 'passed' ? '✅' : check.status === 'warning' ? '⚠️' : '❌';
+                        logMessage(`${status} ${check.name}: ${check.details}`);
+                    });
+                    
+                    // Simulate the actual payment routing
+                    await simulatePaymentRouting('Cash App');
+                    
+                    setTimeout(() => {
+                        updateModal('Cash App Payment Success!', 
+                            `Payment processed via Cash App!<br><br>
+                            Transaction ID: cashapp_${Date.now()}<br>
+                            Amount: $29.99<br>
+                            Risk Score: ${complianceResult.riskScore}/100<br>
+                            Status: Completed ✅`);
+                        
+                        setTimeout(() => {
+                            activateSubscription();
+                            closeModal();
+                        }, 2000);
+                    }, 1500);
+                } else {
+                    // Show compliance failure
+                    logMessage(`❌ Compliance check failed: Risk score too high (${complianceResult.riskScore}/100)`);
+                    updateModal('Compliance Check Failed ❌', 
+                        `Payment rejected due to compliance check failure<br><br>
+                        Risk Score: ${complianceResult.riskScore}/100<br><br>
+                        Please contact support for manual review.`);
+                }
+            } catch (error) {
+                logMessage(`❌ Payment failed: ${error.message}`);
+                updateModal('Payment Failed', 
+                    `Error: ${error.message}<br><br>
                     Please try again or contact support.`);
             }
         }

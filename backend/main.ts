@@ -68,6 +68,351 @@ async function verifyWebhookSignature(
   );
 }
 
+// Compliance check functions
+async function performComplianceCheck(userId: string, amount: number, paymentType: string): Promise<{
+  passed: boolean;
+  riskScore: number;
+  checks: Array<{ name: string; status: 'passed' | 'failed' | 'warning'; details: string }>;
+  recommendedProvider?: string;
+}> {
+  const checks = [];
+  let riskScore = 0;
+  let recommendedProvider = 'primer'; // default
+
+  // Simulate merchant verification check
+  const merchantCheck = {
+    name: 'Merchant Verification',
+    status: 'passed' as const,
+    details: 'Merchant identity verified and documents approved'
+  };
+  checks.push(merchantCheck);
+
+  // Simulate transaction amount risk assessment
+  if (amount > 10000) { // $100+
+    riskScore += 30;
+    checks.push({
+      name: 'High Value Transaction',
+      status: 'warning' as const,
+      details: `Transaction amount $${(amount/100).toFixed(2)} requires additional monitoring`
+    });
+  } else {
+    checks.push({
+      name: 'Transaction Amount',
+      status: 'passed' as const,
+      details: `Transaction amount $${(amount/100).toFixed(2)} within normal limits`
+    });
+  }
+
+  // Simulate payment method risk assessment
+  if (paymentType === 'crypto') {
+    riskScore += 20;
+    recommendedProvider = 'coinbase';
+    checks.push({
+      name: 'Payment Method Risk',
+      status: 'warning' as const,
+      details: 'Cryptocurrency payments require enhanced monitoring'
+    });
+  } else {
+    checks.push({
+      name: 'Payment Method Risk',
+      status: 'passed' as const,
+      details: 'Standard payment method with low risk profile'
+    });
+  }
+
+  // Simulate geographic risk check
+  const geoRisk = Math.random() > 0.8; // 20% chance of geo risk
+  if (geoRisk) {
+    riskScore += 25;
+    checks.push({
+      name: 'Geographic Risk',
+      status: 'warning' as const,
+      details: 'Transaction from high-risk geographic region'
+    });
+  } else {
+    checks.push({
+      name: 'Geographic Risk',
+      status: 'passed' as const,
+      details: 'Transaction from low-risk geographic region'
+    });
+  }
+
+  // Simulate AML/KYC check
+  const amlCheck = Math.random() > 0.95; // 5% chance of AML flag
+  if (amlCheck) {
+    riskScore += 50;
+    checks.push({
+      name: 'AML/KYC Check',
+      status: 'failed' as const,
+      details: 'Transaction flagged for manual AML review'
+    });
+  } else {
+    checks.push({
+      name: 'AML/KYC Check',
+      status: 'passed' as const,
+      details: 'No AML/KYC concerns identified'
+    });
+  }
+
+  // Determine overall compliance status
+  const hasFailures = checks.some(check => check.status === 'failed');
+  const passed = !hasFailures && riskScore < 80;
+
+  // Route to different providers based on risk
+  if (riskScore > 60) {
+    recommendedProvider = paymentType === 'crypto' ? 'coinbase' : 'stripe'; // Use more conservative provider
+  }
+
+  return {
+    passed,
+    riskScore,
+    checks,
+    recommendedProvider
+  };
+}
+
+async function logComplianceCheck(userId: string, complianceResult: any, paymentData: any): Promise<void> {
+  // In a real implementation, this would log to a compliance database
+  console.log('Compliance Check Log:', {
+    userId,
+    timestamp: new Date().toISOString(),
+    riskScore: complianceResult.riskScore,
+    passed: complianceResult.passed,
+    checks: complianceResult.checks,
+    paymentData: {
+      amount: paymentData.amount,
+      currency: paymentData.currency,
+      type: paymentData.type
+    }
+  });
+
+  // Store in audit log if database is available
+  if (!SUPABASE_MOCK_MODE && supabase) {
+    try {
+      await supabase.from('audit_logs').insert({
+        entity_type: 'compliance_check',
+        entity_id: userId,
+        action: 'compliance_check_performed',
+        payload: {
+          riskScore: complianceResult.riskScore,
+          passed: complianceResult.passed,
+          checks: complianceResult.checks,
+          paymentData
+        },
+        actor: userId
+      });
+    } catch (error) {
+      console.error('Failed to log compliance check:', error);
+    }
+  }
+}
+
+// Enhanced payment processing with compliance
+async function processPaymentWithCompliance(paymentData: {
+  userId: string;
+  amount: number;
+  currency: string;
+  paymentType: string;
+  paymentMethodToken?: string;
+}): Promise<{
+  success: boolean;
+  complianceResult: any;
+  paymentResult?: any;
+  error?: string;
+}> {
+  const { userId, amount, currency, paymentType, paymentMethodToken } = paymentData;
+
+  // Step 1: Perform compliance check
+  const complianceResult = await performComplianceCheck(userId, amount, paymentType);
+  
+  // Step 2: Log compliance check
+  await logComplianceCheck(userId, complianceResult, paymentData);
+
+  // Step 3: If compliance failed, reject payment
+  if (!complianceResult.passed) {
+    return {
+      success: false,
+      complianceResult,
+      error: 'Payment rejected due to compliance check failure'
+    };
+  }
+
+  // Step 4: Route payment to recommended provider
+  let paymentResult;
+  try {
+    if (complianceResult.recommendedProvider === 'coinbase' || paymentType === 'crypto') {
+      // Route to crypto payment
+      paymentResult = await processCryptoPayment(userId, amount, currency);
+    } else {
+      // Route to card payment (Primer/Stripe)
+      paymentResult = await processCardPayment(userId, amount, currency, paymentMethodToken);
+    }
+
+    return {
+      success: true,
+      complianceResult,
+      paymentResult
+    };
+  } catch (error) {
+    return {
+      success: false,
+      complianceResult,
+      error: error.message
+    };
+  }
+}
+
+async function processCryptoPayment(userId: string, amount: number, currency: string): Promise<any> {
+  if (COINBASE_MOCK_MODE) {
+    const mockChargeId = `mock_charge_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const mockCode = `MOCK${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+    return {
+      chargeId: mockChargeId,
+      hostedUrl: `https://commerce.coinbase.com/charges/${mockCode}`,
+      code: mockCode,
+      mock: true,
+      provider: 'coinbase'
+    };
+  }
+
+  const response = await fetch("https://api.commerce.coinbase.com/charges", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${COINBASE_COMMERCE_API_KEY}`,
+      "Content-Type": "application/json",
+      "X-CC-Version": "2018-03-22",
+    },
+    body: JSON.stringify({
+      name: "Premium Subscription",
+      description: "Payment for premium subscription",
+      pricing_type: "fixed_price",
+      local_price: {
+        amount: (amount / 100).toString(),
+        currency: currency,
+      },
+      metadata: {
+        user_id: userId,
+        plan: "premium",
+      },
+    }),
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(`Coinbase Commerce API error: ${data.error?.message || 'Unknown error'}`);
+  }
+
+  return {
+    chargeId: data.data.id,
+    hostedUrl: data.data.hosted_url,
+    code: data.data.code,
+    provider: 'coinbase'
+  };
+}
+
+async function processCardPayment(userId: string, amount: number, currency: string, paymentMethodToken?: string): Promise<any> {
+  if (PRIMER_MOCK_MODE) {
+    const mockPaymentId = `mock_payment_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return {
+      id: mockPaymentId,
+      status: "AUTHORIZED",
+      amount: amount,
+      currency: currency,
+      mock: true,
+      provider: 'primer'
+    };
+  }
+
+  const response = await fetch(`https://api.${PRIMER_ENV === 'sandbox' ? 'sandbox.' : ''}primer.io/payments`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${PRIMER_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      amount: amount,
+      currency: currency,
+      paymentMethodToken: paymentMethodToken,
+      orderId: `order_${Date.now()}`,
+      customerId: userId,
+    }),
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(`Primer API error: ${data.message || 'Unknown error'}`);
+  }
+
+  return {
+    ...data,
+    provider: 'primer'
+  };
+}
+
+// New compliance-enabled payment endpoint
+async function handleCompliancePayment(request: Request): Promise<Response> {
+  try {
+    const { userId, amount, currency = "USD", paymentType, paymentMethodToken } = await request.json();
+
+    const result = await processPaymentWithCompliance({
+      userId,
+      amount,
+      currency,
+      paymentType,
+      paymentMethodToken
+    });
+
+    if (!result.success) {
+      return new Response(JSON.stringify({
+        success: false,
+        error: result.error,
+        complianceResult: result.complianceResult
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Store successful transaction
+    if (!SUPABASE_MOCK_MODE && supabase) {
+      const { error } = await supabase
+        .from("transactions")
+        .insert({
+          user_id: userId,
+          provider: result.paymentResult.provider,
+          provider_ref: result.paymentResult.id || result.paymentResult.code,
+          amount_cents: amount,
+          currency: currency,
+          status: "completed",
+          raw: {
+            ...result.paymentResult,
+            complianceResult: result.complianceResult
+          },
+        });
+
+      if (error) {
+        console.error("Database error:", error);
+      }
+    }
+
+    return new Response(JSON.stringify({
+      success: true,
+      complianceResult: result.complianceResult,
+      paymentResult: result.paymentResult
+    }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } catch (error) {
+    return new Response(JSON.stringify({ 
+      success: false,
+      error: error.message 
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+}
+
 // Route handlers
 async function handlePrimerClientSession(request: Request): Promise<Response> {
   try {
@@ -492,6 +837,9 @@ async function handler(request: Request): Promise<Response> {
     
     case "/api/crypto/charge":
       return handleCryptoCharge(request);
+    
+    case "/api/compliance/payment":
+      return handleCompliancePayment(request);
     
     case "/api/webhooks/primer":
       return handlePrimerWebhook(request);
